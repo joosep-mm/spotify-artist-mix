@@ -7,7 +7,10 @@
   },
   "scripts": {
     "dev": "vinext dev",
+    "dev:github-pages": "vite --config vite.github.config.ts",
     "build": "vinext build",
+    "build:github-pages": "vite build --config vite.github.config.ts",
+    "preview:github-pages": "vite preview --config vite.github.config.ts",
     "start": "wrangler dev --config dist/server/wrangler.json",
     "lint": "oxlint app lib",
     "format": "oxfmt"

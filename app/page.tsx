@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import { SyntheticEvent, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowUpRight,
@@ -22,6 +21,7 @@ import {
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { SpotifyArtwork } from '@/components/spotify-artwork';
 import {
   addPlaylistItems,
   beginAuthorization,
@@ -351,7 +351,7 @@ export default function Home() {
                 <div className="absolute z-20 mt-2 max-h-[360px] w-full overflow-auto rounded-2xl border bg-popover p-2 shadow-[0_20px_55px_rgb(30_35_29/18%)]">
                   {results.map((artist) => (
                     <button key={artist.id} onClick={() => chooseArtist(artist)} className="flex w-full items-center gap-3 rounded-xl p-2 text-left transition hover:bg-muted focus-visible:bg-muted focus-visible:outline-none">
-                      {artistImage(artist) ? <Image src={artistImage(artist)!} alt="" width={44} height={44} unoptimized className="size-11 rounded-full object-cover" /> : <span className="grid size-11 place-items-center rounded-full bg-secondary text-xs font-bold">{initials(artist.name)}</span>}
+                      {artistImage(artist) ? <SpotifyArtwork src={artistImage(artist)!} size={44} className="size-11 rounded-full object-cover" /> : <span className="grid size-11 place-items-center rounded-full bg-secondary text-xs font-bold">{initials(artist.name)}</span>}
                       <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{artist.name}</span><span className="text-xs text-muted-foreground">Artist on Spotify</span></span>
                       <ChevronRight className="size-4 text-muted-foreground" />
                     </button>
@@ -367,7 +367,7 @@ export default function Home() {
                 <div className="flex flex-wrap gap-3">
                   {selected.map((artist) => (
                     <div key={artist.id} className="flex items-center gap-2 rounded-full border bg-background py-1.5 pl-1.5 pr-2">
-                      {artistImage(artist) ? <Image src={artistImage(artist)!} alt="" width={36} height={36} unoptimized className="size-9 rounded-full object-cover" /> : <span className="grid size-9 place-items-center rounded-full bg-secondary text-[11px] font-bold">{initials(artist.name)}</span>}
+                      {artistImage(artist) ? <SpotifyArtwork src={artistImage(artist)!} size={36} className="size-9 rounded-full object-cover" /> : <span className="grid size-9 place-items-center rounded-full bg-secondary text-[11px] font-bold">{initials(artist.name)}</span>}
                       <span className="max-w-40 truncate text-sm font-medium">{artist.name}</span>
                       <button className="grid size-7 place-items-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground" onClick={() => removeArtist(artist.id)} aria-label={`Remove ${artist.name}`} disabled={isGenerating}><X className="size-3.5" /></button>
                     </div>
@@ -444,7 +444,7 @@ export default function Home() {
               {previewTracks.map((track, index) => (
                 <li key={`${track.uri}-${index}`} className="flex min-w-0 items-center gap-3 border-b py-3.5">
                   <span className="w-6 shrink-0 text-right text-xs font-semibold tabular-nums text-muted-foreground">{index + 1}</span>
-                  {trackImage(track) ? <Image src={trackImage(track)!} alt="" width={48} height={48} unoptimized className="size-12 shrink-0 rounded-lg object-cover" /> : <span className="grid size-12 shrink-0 place-items-center rounded-lg bg-muted"><Music2 className="size-4 text-muted-foreground" /></span>}
+                  {trackImage(track) ? <SpotifyArtwork src={trackImage(track)!} size={48} className="size-12 shrink-0 rounded-lg object-cover" /> : <span className="grid size-12 shrink-0 place-items-center rounded-lg bg-muted"><Music2 className="size-4 text-muted-foreground" /></span>}
                   <span className="min-w-0 flex-1"><a href={track.external_urls.spotify} target="_blank" rel="noreferrer" className="block truncate text-sm font-semibold hover:underline">{track.name}</a><span className="block truncate text-xs text-muted-foreground">{track.artists.map((artist) => artist.name).join(', ')}</span></span>
                 </li>
               ))}
