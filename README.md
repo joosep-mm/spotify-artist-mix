@@ -1,6 +1,6 @@
 # Artist Mix
 
-A browser-only TypeScript app that creates one Spotify playlist from up to 10 Spotify-ranked track search results for each selected artist.
+A browser-only TypeScript app that creates a shuffled Spotify playlist from selected artists. Choose a track count per artist or a single total count, then review and reshuffle the running order before creating the playlist.
 
 ## Spotify setup
 
