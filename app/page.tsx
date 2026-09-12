@@ -5,7 +5,7 @@ import { SyntheticEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowUpRight, Check, ChevronRight, CircleAlert, Copy, Headphones, LoaderCircle, LogOut, Music2, Search, Settings2, Sparkles, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { addPlaylistItems, beginAuthorization, clearAuthorization, createPlaylist, finishAuthorization, getAccessToken, getArtistTopTracks, hasRefreshToken, redirectUri, searchArtists, SpotifyApiError, SpotifyArtist, SpotifyPlaylist } from '@/lib/spotify';
+import { addPlaylistItems, beginAuthorization, clearAuthorization, createPlaylist, finishAuthorization, getAccessToken, hasRefreshToken, redirectUri, searchArtists, searchArtistTracks, SpotifyApiError, SpotifyArtist, SpotifyPlaylist } from '@/lib/spotify';
 
 const CLIENT_ID_KEY = 'artist-mix.spotify-client-id';
 const MAX_ARTISTS = 20;
@@ -113,13 +113,13 @@ export default function Home() {
     try {
       setGeneration('collecting');
       const tracks = [];
-      for (const artist of selected) tracks.push(...await getArtistTopTracks(clientId, artist.id));
+      for (const artist of selected) tracks.push(...await searchArtistTracks(clientId, artist));
       const uniqueTracks = Array.from(new Map(tracks.map((track) => [track.uri, track])).values());
-      if (!uniqueTracks.length) throw new Error('Spotify did not return any top tracks for this lineup.');
+      if (!uniqueTracks.length) throw new Error('Spotify did not return any matching tracks for this lineup.');
       setGeneration('creating');
       const artistNames = selected.map((artist) => artist.name);
       const title = artistNames.length <= 3 ? artistNames.join(' + ') : `${artistNames.slice(0, 2).join(' + ')} + ${artistNames.length - 2} more`;
-      const created = await createPlaylist(clientId, `Artist Mix: ${title}`, `Top tracks from ${artistNames.join(', ')}. Created with Artist Mix.`);
+      const created = await createPlaylist(clientId, `Artist Mix: ${title}`, `Spotify-ranked track matches for ${artistNames.join(', ')}. Created with Artist Mix.`);
       setGeneration('adding');
       await addPlaylistItems(clientId, created.id, uniqueTracks.map((track) => track.uri));
       setTrackCount(uniqueTracks.length); setPlaylist(created); setGeneration('success');
@@ -127,7 +127,7 @@ export default function Home() {
   }
 
   async function copyRedirectUri() { await navigator.clipboard.writeText(redirectUri()); setCopied(true); window.setTimeout(() => setCopied(false), 1800); }
-  const generationLabel = generation === 'collecting' ? 'Finding top tracks…' : generation === 'creating' ? 'Creating playlist…' : generation === 'adding' ? 'Adding tracks…' : 'Generate playlist';
+  const generationLabel = generation === 'collecting' ? 'Finding tracks…' : generation === 'creating' ? 'Creating playlist…' : generation === 'adding' ? 'Adding tracks…' : 'Generate playlist';
 
   return (
     <main className="min-h-screen px-4 py-4 sm:px-7 sm:py-6"><div className="mx-auto max-w-[1180px]">
@@ -150,7 +150,7 @@ export default function Home() {
 
       <section className="grid gap-6 pb-8 pt-10 lg:grid-cols-[minmax(0,1fr)_390px] lg:pt-14">
         <div className="rounded-[32px] bg-card p-6 shadow-[0_22px_70px_rgb(30_35_29/8%)] sm:p-10 lg:p-12">
-          <div className="mb-9 max-w-2xl"><span className="mb-5 inline-flex items-center gap-2 rounded-full bg-accent px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-accent-foreground"><Sparkles className="size-3.5" /> Build your mix</span><h1 className="font-heading text-4xl font-semibold tracking-[-0.045em] sm:text-6xl">A little bit of everyone you love.</h1><p className="mt-5 max-w-xl text-base leading-7 text-muted-foreground sm:text-lg">Pick a handful of artists. We’ll gather their top tracks and turn them into one ready-to-play Spotify playlist.</p></div>
+          <div className="mb-9 max-w-2xl"><span className="mb-5 inline-flex items-center gap-2 rounded-full bg-accent px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-accent-foreground"><Sparkles className="size-3.5" /> Build your mix</span><h1 className="font-heading text-4xl font-semibold tracking-[-0.045em] sm:text-6xl">A little bit of everyone you love.</h1><p className="mt-5 max-w-xl text-base leading-7 text-muted-foreground sm:text-lg">Pick a handful of artists. We’ll find up to 10 Spotify-ranked tracks for each and turn them into one ready-to-play playlist.</p></div>
           <label className="mb-2 block text-sm font-semibold" htmlFor="artist-search">Find an artist</label>
           <div className="relative">
             {searching ? <LoaderCircle className="absolute left-4 top-1/2 size-5 -translate-y-1/2 animate-spin text-muted-foreground" /> : <Search className="absolute left-4 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />}
@@ -164,7 +164,7 @@ export default function Home() {
         </div>
 
         <aside className="flex min-h-[430px] flex-col justify-between overflow-hidden rounded-[32px] bg-[#1f241f] p-7 text-[#f6f3eb] sm:p-9">
-          {generation === 'success' && playlist ? <div className="flex h-full flex-col justify-between"><div><span className="grid size-12 place-items-center rounded-2xl bg-[#a7e769] text-[#172015]"><Check className="size-6" /></span><p className="mt-8 text-sm font-medium text-white/55">Playlist created</p><h2 className="mt-2 font-heading text-3xl font-semibold tracking-[-0.035em]">{playlist.name}</h2><p className="mt-4 text-sm leading-6 text-white/60">{trackCount} unique tracks are waiting for you in Spotify.</p></div><a href={playlist.external_urls.spotify} target="_blank" rel="noreferrer" className="mt-12 flex h-14 items-center justify-center gap-2 rounded-2xl bg-[#a7e769] text-base font-semibold text-[#162012] transition hover:bg-[#b8ef82]">Open in Spotify <ArrowUpRight className="size-4" /></a></div> : <><div><span className="grid size-12 place-items-center rounded-2xl bg-white/10"><Headphones className="size-6" /></span><p className="mt-8 text-sm font-medium text-white/55">{selected.length ? 'Your mix is ready to make' : 'Ready when you are'}</p><h2 className="mt-2 font-heading text-3xl font-semibold tracking-[-0.035em]">Top tracks, beautifully mixed.</h2><p className="mt-4 text-sm leading-6 text-white/60">Duplicates are removed automatically. Your lineup stays in this tab and Spotify content is never stored.</p></div><Button onClick={authStatus === 'connected' ? generatePlaylist : connect} disabled={authStatus === 'checking' || (authStatus === 'connected' && (!selected.length || isGenerating))} className="mt-12 h-14 w-full rounded-2xl bg-[#a7e769] text-base font-semibold text-[#162012] hover:bg-[#b8ef82] disabled:bg-white/10 disabled:text-white/40 disabled:opacity-100">{isGenerating && <LoaderCircle className="mr-1 animate-spin" />}{authStatus !== 'connected' ? 'Connect to start' : generationLabel}</Button></>}
+          {generation === 'success' && playlist ? <div className="flex h-full flex-col justify-between"><div><span className="grid size-12 place-items-center rounded-2xl bg-[#a7e769] text-[#172015]"><Check className="size-6" /></span><p className="mt-8 text-sm font-medium text-white/55">Playlist created</p><h2 className="mt-2 font-heading text-3xl font-semibold tracking-[-0.035em]">{playlist.name}</h2><p className="mt-4 text-sm leading-6 text-white/60">{trackCount} unique tracks are waiting for you in Spotify.</p></div><a href={playlist.external_urls.spotify} target="_blank" rel="noreferrer" className="mt-12 flex h-14 items-center justify-center gap-2 rounded-2xl bg-[#a7e769] text-base font-semibold text-[#162012] transition hover:bg-[#b8ef82]">Open in Spotify <ArrowUpRight className="size-4" /></a></div> : <><div><span className="grid size-12 place-items-center rounded-2xl bg-white/10"><Headphones className="size-6" /></span><p className="mt-8 text-sm font-medium text-white/55">{selected.length ? 'Your mix is ready to make' : 'Ready when you are'}</p><h2 className="mt-2 font-heading text-3xl font-semibold tracking-[-0.035em]">Spotify-ranked tracks, beautifully mixed.</h2><p className="mt-4 text-sm leading-6 text-white/60">We preserve Spotify search ranking, remove duplicates automatically, and never store Spotify content.</p></div><Button onClick={authStatus === 'connected' ? generatePlaylist : connect} disabled={authStatus === 'checking' || (authStatus === 'connected' && (!selected.length || isGenerating))} className="mt-12 h-14 w-full rounded-2xl bg-[#a7e769] text-base font-semibold text-[#162012] hover:bg-[#b8ef82] disabled:bg-white/10 disabled:text-white/40 disabled:opacity-100">{isGenerating && <LoaderCircle className="mr-1 animate-spin" />}{authStatus !== 'connected' ? 'Connect to start' : generationLabel}</Button></>}
         </aside>
       </section>
 

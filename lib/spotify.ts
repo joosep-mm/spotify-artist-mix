@@ -9,7 +9,7 @@ const STATE_KEY = 'artist-mix.oauth-state';
 
 export type SpotifyImage = { url: string; height?: number | null; width?: number | null };
 export type SpotifyArtist = { id: string; name: string; images: SpotifyImage[]; external_urls: { spotify?: string }; uri: string };
-export type SpotifyTrack = { id: string; name: string; uri: string; artists: Array<{ id: string; name: string }>; album: { name: string; images: SpotifyImage[] }; external_urls: { spotify?: string } };
+export type SpotifyTrack = { id: string; name: string; uri: string; artists: Array<{ id: string; name: string }>; album: { name: string; images: SpotifyImage[] }; external_urls: { spotify?: string }; popularity?: number };
 export type SpotifyPlaylist = { id: string; name: string; external_urls: { spotify?: string } };
 type StoredAccessToken = { accessToken: string; expiresAt: number };
 type TokenResponse = { access_token: string; token_type: string; scope: string; expires_in: number; refresh_token?: string };
@@ -82,14 +82,24 @@ export async function getAccessToken(clientId: string) {
 export function hasRefreshToken() { return Boolean(localStorage.getItem(REFRESH_TOKEN_KEY)); }
 export function clearAuthorization() { sessionStorage.removeItem(ACCESS_TOKEN_KEY); sessionStorage.removeItem(VERIFIER_KEY); sessionStorage.removeItem(STATE_KEY); localStorage.removeItem(REFRESH_TOKEN_KEY); }
 
-async function spotifyFetch<T>(clientId: string, path: string, init?: RequestInit, retry = true): Promise<T> {
+function wait(milliseconds: number) { return new Promise((resolve) => window.setTimeout(resolve, milliseconds)); }
+
+async function spotifyFetch<T>(clientId: string, path: string, init?: RequestInit, authRetry = true, rateAttempt = 0): Promise<T> {
   const accessToken = await getAccessToken(clientId);
   if (!accessToken) throw new SpotifyApiError('Connect your Spotify account to continue.', 401);
   const headers = new Headers(init?.headers);
   headers.set('Authorization', `Bearer ${accessToken}`);
   if (init?.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
   const response = await fetch(`${SPOTIFY_API_BASE}${path}`, { ...init, headers });
-  if (response.status === 401 && retry) { sessionStorage.removeItem(ACCESS_TOKEN_KEY); return spotifyFetch<T>(clientId, path, init, false); }
+  if (response.status === 401 && authRetry) { sessionStorage.removeItem(ACCESS_TOKEN_KEY); return spotifyFetch<T>(clientId, path, init, false, rateAttempt); }
+  if (response.status === 429 && rateAttempt < 3) {
+    const retryAfterSeconds = Number(response.headers.get('Retry-After'));
+    const delay = Number.isFinite(retryAfterSeconds) && retryAfterSeconds >= 0
+      ? retryAfterSeconds * 1000
+      : (2 ** rateAttempt) * 1000 + Math.floor(Math.random() * 250);
+    await wait(delay);
+    return spotifyFetch<T>(clientId, path, init, authRetry, rateAttempt + 1);
+  }
   if (!response.ok) {
     let message = `Spotify request failed (${response.status}).`;
     try { const payload = await response.json() as { error?: { message?: string } | string }; if (typeof payload.error === 'string') message = payload.error; else if (payload.error?.message) message = payload.error.message; }
@@ -105,9 +115,14 @@ export async function searchArtists(clientId: string, query: string, signal?: Ab
   return response.artists.items;
 }
 
-export async function getArtistTopTracks(clientId: string, artistId: string) {
-  const response = await spotifyFetch<{ tracks: SpotifyTrack[] }>(clientId, `/artists/${encodeURIComponent(artistId)}/top-tracks`);
-  return response.tracks;
+export async function searchArtistTracks(clientId: string, artist: SpotifyArtist) {
+  const safeName = artist.name.replace(/"/g, ' ').replace(/\s+/g, ' ').trim();
+  const params = new URLSearchParams({ q: `artist:"${safeName}"`, type: 'track', limit: '10' });
+  const response = await spotifyFetch<{ tracks: { items: SpotifyTrack[] } }>(clientId, `/search?${params}`);
+  return response.tracks.items
+    .filter((track) => track.artists.some((trackArtist) => trackArtist.id === artist.id))
+    .sort((first, second) => (second.popularity ?? -1) - (first.popularity ?? -1))
+    .slice(0, 10);
 }
 
 export function createPlaylist(clientId: string, name: string, description: string) {
